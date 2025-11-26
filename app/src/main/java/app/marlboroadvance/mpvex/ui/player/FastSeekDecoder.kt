@@ -1,11 +1,10 @@
 package app.marlboroadvance.mpvex.ui.player
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 
 class FastSeekDecoder {
     private external fun nativeInit(videoPath: String): Boolean
-    private external fun nativeSeekTo(positionMs: Long): ByteArray?
+    private external fun nativeSeekTo(positionMs: Long): Bitmap?
     private external fun nativeGetDuration(): Long
     private external fun nativeRelease()
     
@@ -18,14 +17,12 @@ class FastSeekDecoder {
     
     fun seekTo(positionMs: Long): Bitmap? {
         if (!isInitialized) return null
-        val jpegData = nativeSeekTo(positionMs)
-        
-        // For now, return a dummy bitmap for testing
-        // Remove this when native implementation returns real frames
-        val dummyBitmap = Bitmap.createBitmap(160, 90, Bitmap.Config.ARGB_8888)
-        dummyBitmap.eraseColor(0xFF303030.toInt()) // Dark gray
-        
-        return dummyBitmap
+        return try {
+            nativeSeekTo(positionMs)
+        } catch (e: Exception) {
+            println("Native seek failed: ${e.message}")
+            null
+        }
     }
     
     fun getDuration(): Long {
