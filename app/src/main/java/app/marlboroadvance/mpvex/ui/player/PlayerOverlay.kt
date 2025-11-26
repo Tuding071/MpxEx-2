@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,7 @@ import kotlin.math.abs
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
+import android.graphics.Bitmap
 
 @Composable
 fun PlayerOverlay(
@@ -172,6 +174,24 @@ fun PlayerOverlay(
             if (fastSeekInitialized) {
                 fastSeekDecoder.release()
                 println("Fast seek decoder released")
+            }
+        }
+    }
+    
+    // ADD: Helper function to get video path for seek decoder
+    fun getVideoPathForSeekDecoder(context: android.content.Context): String? {
+        val intent = (context as? android.app.Activity)?.intent
+        return when {
+            intent?.action == Intent.ACTION_SEND -> {
+                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                uri?.toString()
+            }
+            intent?.action == Intent.ACTION_VIEW -> {
+                intent.data?.toString()
+            }
+            else -> {
+                // Try to get from MPV properties
+                MPVLib.getPropertyString("path")
             }
         }
     }
@@ -456,24 +476,6 @@ fun PlayerOverlay(
         isHorizontalSwipe = false
         isVerticalSwipe = false
         isLongTap = false
-    }
-    
-    // ADD: Helper function to get video path for seek decoder
-    fun getVideoPathForSeekDecoder(context: android.content.Context): String? {
-        val intent = (context as? android.app.Activity)?.intent
-        return when {
-            intent?.action == Intent.ACTION_SEND -> {
-                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-                uri?.toString()
-            }
-            intent?.action == Intent.ACTION_VIEW -> {
-                intent.data?.toString()
-            }
-            else -> {
-                // Try to get from MPV properties
-                MPVLib.getPropertyString("path")
-            }
-        }
     }
     
     LaunchedEffect(Unit) {
@@ -807,7 +809,7 @@ fun PlayerOverlay(
     }
 }
 
-// ... keep your existing SimpleDraggableProgressBar and other functions unchanged ...
+// ... keep your existing SimpleDraggableProgressBar and other functions unchanged
 
 @Composable
 fun SimpleDraggableProgressBar(
