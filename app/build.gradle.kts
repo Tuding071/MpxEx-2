@@ -40,11 +40,11 @@ android {
     }
   }
 
-  // FIXED: External native build configuration (Kotlin DSL syntax)
+  // FIXED: External native build configuration (Kotlin DSL syntax) - removed version
   externalNativeBuild {
     cmake {
       path = file("src/main/cpp/CMakeLists.txt")
-      version = "3.18.1"
+      // REMOVED: version = "3.18.1" - let it use the default available version
     }
   }
 
