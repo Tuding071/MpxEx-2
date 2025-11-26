@@ -30,7 +30,24 @@ android {
 
     buildConfigField("String", "GIT_SHA", "\"${getCommitSha()}\"")
     buildConfigField("int", "GIT_COUNT", getCommitCount())
+
+    // ADD: External native build configuration for CMake
+    externalNativeBuild {
+      cmake {
+        cppFlags "-std=c++17"
+        arguments "-DANDROID_STL=c++_shared"
+      }
+    }
   }
+
+  // ADD: External native build configuration
+  externalNativeBuild {
+    cmake {
+      path "src/main/cpp/CMakeLists.txt"
+      version "3.18.1"
+    }
+  }
+
   splits {
     abi {
       isEnable = true
@@ -154,6 +171,9 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.truetype.parser)
   implementation(libs.fsaf)
+
+  // ADD: Core KTX for better native integration
+  implementation("androidx.core:core-ktx:1.12.0")
 }
 
 detekt {
