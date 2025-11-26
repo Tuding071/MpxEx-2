@@ -56,6 +56,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import android.content.Intent
 import android.net.Uri
 import kotlin.math.abs
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
 
 @Composable
 fun PlayerOverlay(
@@ -133,7 +136,45 @@ fun PlayerOverlay(
     var currentVolume by remember { mutableStateOf(viewModel.currentVolume.value) }
     var volumeFeedbackJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     
+    // ADD: Fast seek decoder states
+    val fastSeekDecoder = remember { FastSeekDecoder() }
+    var seekPreview by remember { mutableStateOf<ImageBitmap?>(null) }
+    var useFastSeek by remember { mutableStateOf(false) }
+    var fastSeekInitialized by remember { mutableStateOf(false) }
+    
     val coroutineScope = remember { CoroutineScope(Dispatchers.Main) }
+    
+    // ADD: Initialize fast seek decoder
+    LaunchedEffect(fileName) {
+        try {
+            val videoPath = getVideoPathForSeekDecoder(context)
+            if (videoPath != null) {
+                useFastSeek = fastSeekDecoder.init(videoPath)
+                fastSeekInitialized = useFastSeek
+                if (useFastSeek) {
+                    println("Fast seek decoder initialized successfully")
+                } else {
+                    println("Fast seek decoder initialization failed")
+                }
+            } else {
+                println("No video path available for fast seek decoder")
+            }
+        } catch (e: Exception) {
+            println("Fast seek decoder error: ${e.message}")
+            useFastSeek = false
+            fastSeekInitialized = false
+        }
+    }
+    
+    // ADD: Cleanup fast seek decoder
+    DisposableEffect(Unit) {
+        onDispose {
+            if (fastSeekInitialized) {
+                fastSeekDecoder.release()
+                println("Fast seek decoder released")
+            }
+        }
+    }
     
     // UPDATED: performRealTimeSeek with throttle
     fun performRealTimeSeek(targetPosition: Double) {
@@ -297,7 +338,8 @@ fun PlayerOverlay(
         wasPlayingBeforeSeek = MPVLib.getPropertyBoolean("pause") == false
         isSeeking = true
         showSeekTime = true
-        // REMOVED: lastSeekTime = 0L
+        // Clear previous seek preview
+        seekPreview = null
         
         if (wasPlayingBeforeSeek) {
             MPVLib.setPropertyBoolean("pause", true)
@@ -323,7 +365,7 @@ fun PlayerOverlay(
         }
     }
     
-    // UPDATED: handleHorizontalSeeking without debouncing
+    // UPDATED: handleHorizontalSeeking without debouncing + fast seek preview
     fun handleHorizontalSeeking(currentX: Float) {
         if (!isSeeking) return
         
@@ -340,6 +382,20 @@ fun PlayerOverlay(
         // ALWAYS update UI instantly
         seekTargetTime = formatTimeSimple(clampedPosition)
         currentTime = formatTimeSimple(clampedPosition)
+        
+        // ADD: Get fast seek preview if available
+        if (useFastSeek && fastSeekInitialized) {
+            try {
+                val previewBitmap = fastSeekDecoder.seekTo((clampedPosition * 1000).toLong())
+                previewBitmap?.let { bitmap ->
+                    seekPreview = bitmap.asImageBitmap()
+                }
+            } catch (e: Exception) {
+                // If fast seek fails, disable it and continue with normal seeking
+                useFastSeek = false
+                println("Fast seek preview failed: ${e.message}")
+            }
+        }
         
         // Send seek command with throttle
         performRealTimeSeek(clampedPosition)
@@ -363,6 +419,7 @@ fun PlayerOverlay(
             seekStartPosition = 0.0
             wasPlayingBeforeSeek = false
             seekDirection = "" // Reset direction
+            seekPreview = null // Clear seek preview
             scheduleSeekbarHide()
         }
     }
@@ -399,6 +456,24 @@ fun PlayerOverlay(
         isHorizontalSwipe = false
         isVerticalSwipe = false
         isLongTap = false
+    }
+    
+    // ADD: Helper function to get video path for seek decoder
+    fun getVideoPathForSeekDecoder(context: android.content.Context): String? {
+        val intent = (context as? android.app.Activity)?.intent
+        return when {
+            intent?.action == Intent.ACTION_SEND -> {
+                val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                uri?.toString()
+            }
+            intent?.action == Intent.ACTION_VIEW -> {
+                intent.data?.toString()
+            }
+            else -> {
+                // Try to get from MPV properties
+                MPVLib.getPropertyString("path")
+            }
+        }
     }
     
     LaunchedEffect(Unit) {
@@ -498,7 +573,8 @@ fun PlayerOverlay(
             isSeeking = true
             wasPlayingBeforeSeek = MPVLib.getPropertyBoolean("pause") == false
             showSeekTime = true
-            // REMOVED: lastSeekTime = 0L
+            // Clear previous seek preview
+            seekPreview = null
             if (wasPlayingBeforeSeek) {
                 MPVLib.setPropertyBoolean("pause", true)
             }
@@ -516,6 +592,19 @@ fun PlayerOverlay(
         seekTargetTime = formatTimeSimple(targetPosition)
         currentTime = formatTimeSimple(targetPosition)
         
+        // ADD: Get fast seek preview if available
+        if (useFastSeek && fastSeekInitialized) {
+            try {
+                val previewBitmap = fastSeekDecoder.seekTo((targetPosition * 1000).toLong())
+                previewBitmap?.let { bitmap ->
+                    seekPreview = bitmap.asImageBitmap()
+                }
+            } catch (e: Exception) {
+                useFastSeek = false
+                println("Fast seek preview failed during drag: ${e.message}")
+            }
+        }
+        
         // Send seek command with throttle
         performRealTimeSeek(targetPosition)
     }
@@ -532,6 +621,7 @@ fun PlayerOverlay(
         showSeekTime = false
         wasPlayingBeforeSeek = false
         seekDirection = "" // Reset direction
+        seekPreview = null // Clear seek preview
         scheduleSeekbarHide()
     }
     
@@ -623,6 +713,19 @@ fun PlayerOverlay(
             }
         }
         
+        // ADD: SEEK PREVIEW OVERLAY
+        if (seekPreview != null) {
+            Image(
+                bitmap = seekPreview!!,
+                contentDescription = "Seek preview",
+                modifier = Modifier
+                    .size(160.dp, 90.dp)
+                    .align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .padding(2.dp)
+            )
+        }
+        
         // BOTTOM SEEK BAR AREA
         if (showSeekbar) {
             Box(
@@ -703,6 +806,8 @@ fun PlayerOverlay(
         }
     }
 }
+
+// ... keep your existing SimpleDraggableProgressBar and other functions unchanged ...
 
 @Composable
 fun SimpleDraggableProgressBar(
