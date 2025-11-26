@@ -20,7 +20,7 @@ find_library(mediandk-lib mediandk)
 find_library(jnigraphics-lib jnigraphics)
 
 # Include directories
-include_directories(${CMAKE_SOURCE_DIR}/src/main/cpp)
+include_directories(src/main/cpp)
 
 # Link libraries
 target_link_libraries(
@@ -30,6 +30,3 @@ target_link_libraries(
     ${mediandk-lib}
     ${jnigraphics-lib}
 )
-
-# Add compilation flags
-target_compile_options(fastseekdecoder PRIVATE -Wall -Wextra -Werror)
