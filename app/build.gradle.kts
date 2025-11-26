@@ -31,20 +31,20 @@ android {
     buildConfigField("String", "GIT_SHA", "\"${getCommitSha()}\"")
     buildConfigField("int", "GIT_COUNT", getCommitCount())
 
-    // ADD: External native build configuration for CMake
+    // FIXED: External native build configuration for CMake (Kotlin DSL syntax)
     externalNativeBuild {
       cmake {
-        cppFlags "-std=c++17"
-        arguments "-DANDROID_STL=c++_shared"
+        cppFlags.add("-std=c++17")
+        arguments.add("-DANDROID_STL=c++_shared")
       }
     }
   }
 
-  // ADD: External native build configuration
+  // FIXED: External native build configuration (Kotlin DSL syntax)
   externalNativeBuild {
     cmake {
-      path "src/main/cpp/CMakeLists.txt"
-      version "3.18.1"
+      setPath(file("src/main/cpp/CMakeLists.txt"))
+      version = "3.18.1"
     }
   }
 
@@ -69,7 +69,7 @@ android {
     create("preview") {
       initWith(getByName("release"))
 
-      signingConfig = signingConfigs["debug"]
+      signingConfig = signingConfigs.getByName("debug")
       applicationIdSuffix = ".preview"
       versionNameSuffix = "-${getCommitCount()}"
     }
